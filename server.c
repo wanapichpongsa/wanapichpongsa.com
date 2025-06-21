@@ -1,37 +1,13 @@
 #include <stdio.h>
-/*
-    Building a HTTP server closest to binary:
-
-   Linux uses BSD (Berkeley Software Distribution) socket
-    whereas Mac's Darwin has a BSD inspired userland (everything outside of kernel).
-
-    Kernel is the OS core managing hardware.
-
-    The big question: How are transistor binary states (physical location in chip)
-    referenced to photon rendered 1s and 0s?
-
-    How: Transistor switch (on/off) -> 5V (1) 0V (0) to part called 'control'
-    Control: gate (control terminal), source (input terminal), drain (output terminal).
-    
-    Ah, so terminal GUI is a digital alias for the transistor's terminal function.
-
-    -> Logic Gates (AND, OR, NOT) <- Combinations that allow binary states to scale in aggregate (but I don't know how they work). 
-    -> Circuits -> Registers -> CPU
-
-    CPU:
-        - ALU: Arithmetic Logic Unit
-        - Control Unit: Decode instructions and control the flow of data
-        - Registers: Temporary storage for data
-        - Cache: Temporary storage for frequently used data
-
-    This includes shell (command interpreter),
-    compilers (AST -> IR (Intermediate Representation) -> Assembly -> Machine Code)
-    and system calls.
-
-*/
-
+#include <time.h> // /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/time.h
 
 // arbitary listener that passively runs in the background
+
+/*
+    the req will come from another server entity (shell interacting with a
+   network) to start with, it'll be easier to think of LAN?
+*/
+
 void listener(int req_header) {
     if (req_header == 0) {
         printf("GET\n");
@@ -51,14 +27,28 @@ void listener(int req_header) {
 }
 
 int main() {
-    int seconds = 60;
-    while (seconds > 0) {
-        // the req will come from another server entity (shell interacting with a network)
-        // to start with, it'll be easier to think of LAN?
-        if (seconds % 10 == 0) {
-            listener(0);
-        }
-        seconds--;
+    /*
+        like how Galileo measured the quotient of a day (hours, minutes,
+       seconds) seconds) using water, how do we measure the number of iterations
+       (script lifetime) in a second?
+
+           1. You have to collect an approximate amount of your measurement from
+       the start until end of a time period you have empirical markers of its
+       start and finish.
+
+           Lucky for us, we can just connect to the computer's digital clock and
+       ask it to run this script for the duration of a second.
+
+           We can use a library, but how do we do this without a library?
+           1. The software location of the clock.
+           2. Borrow/build a filesystem/operating system connector to the clock.
+    */
+    int iterations = 0;
+    time_t start = time(NULL);
+    while (time(NULL) == start) {
+        iterations++;
     }
+    printf("%lld iterations in 1 second\n", (long long)iterations);
+    // 9386303 iterations in 1 second
     return 0;
 }
