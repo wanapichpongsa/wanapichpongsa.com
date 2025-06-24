@@ -9,22 +9,6 @@
 char *views[] = {"/"};
 
 char *get_slug(char *buf) {
-  /*
-    can't init undefined because CPU doesn't clear stack memory
-    because 00000000ing a stack slot would be redundant when they are mostly
-    overwritten by new vals anyways.
-    therefore prev vals from prev calls will be used instead.
-    Safer to init as -1 (0000 0001 -> 1111 1110 + 1 = 1111 1111) || '0x' =
-    base16 (i.e., 4 bits each) + 'FF' [1 bit complement] than 0 because 0 byte is
-    also when stack slot is cleared (just marked differently).
-    ^ Segmenting opposite sets of 5 bit pos and neg ints
-    example given by Intro to Computer Systems:
-    - compiler flags as signed, MSB = 1 means negative.
-    - 1s complement: 01111 -> 10000 = -15, 2s complement: 10000 + 1 -> 10001 =
-    -15, 10000 = -16 instead
-    - ^ 2s complement is 'superior' because it has no redundant -0 (zero is
-    unsigned lol)
-  */
   int start = -1, end = -1;
     for (int i = 0; buf[i] != '\0'; i++) {
         if (start == -1) {
@@ -57,7 +41,6 @@ int same(const char *req_slug, const char *view_slug) {
         ++req_slug; 
         ++view_slug; 
     }
-    printf("req_slug: %c, view_slug: %c\n", *req_slug, *view_slug);
     return *req_slug == *view_slug;
 }
 
@@ -120,16 +103,59 @@ int main() {
 
         int n_views = (int)(sizeof(views) / sizeof(views[0]));
         for (int i = 0; i < n_views; i++) {
-            // we can't compare pointers directly 
+            // we can't compare pointers directly
             int is_same = same(slug, views[i]);
             if (is_same == 1) {
-                char *resp = "HTTP/1.1 200 OK\r\n"
-                             "Content-Length: 12\r\n"
-                             "Connection: close\r\n"
-                             "\r\n"
-                             "Hello World!";
+                /*
+                    PORTING HTML: Just streaming chars via file read.
+                */
+
+                // first get file read pointer
+                FILE *file = fopen("index.html", "r");
+                /* 1️⃣ FILE-SEEK: move read/write cursor 0 bytes from the end →
+                 * lands at EOF (End-Of-File) */
+                fseek(file, 0, SEEK_END);
+
+                /* 2️⃣ FILE-TELL: report current cursor offset; because we are at
+                 * EOF, this equals total byte size */
+                long file_size = ftell(file);
+
+                /* 3️⃣ FILE-SEEK: move cursor 0 bytes from the start (SEEK_SET) →
+                 * rewinds so we can read from byte 0 */
+                fseek(file, 0, SEEK_SET);
+                char *file_content = malloc(file_size + 1);
+                // stream file into file_content, sizeof each char = 1 byte,
+                // no. chars = file_size,
+                fread(file_content, 1, file_size, file);
+                file_content[file_size] = '\0';
+
+                /*
+                    Now concat header and file content body into resp.
+                 */
+                // format string value with NULL destination, 0 size.
+                // Unknown compilation errors that come with run-time formatted string.
+                size_t header_len = snprintf(NULL, 0, 
+                                            "HTTP/1.1 200 OK\r\n"
+                                            "Content-Length: %ld\r\n"
+                                            "Connection: close\r\n"
+                                            "\r\n", file_size);
+
+                char *resp = malloc(header_len + file_size + 1);
+                sprintf(resp,
+                        "HTTP/1.1 200 OK\r\n"
+                        "Content-Length: %ld\r\n"
+                        "Connection: close\r\n"
+                        "\r\n",
+                        file_size);
+
+                memcpy(resp + header_len, file_content, file_size);
+                resp[header_len + file_size] = '\0';
+
                 send_resp(new_client_room_id, resp);
-                printf("HTTP/1.1 200 OK\r\n");
+
+                free(resp);
+                free(file_content);
+                printf("HTTP/1.1 200 %s OK\r\n", slug);
             } else {
                 char *resp = "HTTP/1.1 404 Not Found\r\n"
                              "Content-Length: 12\r\n"
@@ -137,7 +163,7 @@ int main() {
                              "\r\n"
                              "Not Found!";
                 send_resp(new_client_room_id, resp);
-                printf("HTTP/1.1 404 Not Found\r\n");
+                printf("HTTP/1.1 404 %s Not Found\r\n", slug);
             }
         }
         free(buf); // free after variable lifetime ends (no longer needed)
